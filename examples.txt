@@ -1,0 +1,6 @@
+Minimizing cost with fidelity constraints
+Limiting maximum backend time
+Weighted sum objectives
+Minimizing the number of used backends
+Forcing a minimum number of shots on a specific backend (by name)
+Using per-backend expressions in constraints/objectives

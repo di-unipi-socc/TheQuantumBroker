@@ -1,0 +1,6 @@
+asteval
+numpy
+pulp
+typing
+scipy
+sympy
