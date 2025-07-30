@@ -191,6 +191,13 @@ def count_gates(qc):
             two_q += 1
     return one_q, two_q
 
+def evaluate_qpu_single_shot(backend, circuit, rebuild=False):
+    estimates = evaluate_qpu(backend, circuit, shots=1, rebuild=rebuild)
+    if "shots" in estimates:
+        del estimates["shots"]
+    return estimates
+    
+
 def evaluate_qpu(backend, circuit, shots, rebuild=False):
     profile = {}
     if not rebuild:
@@ -254,8 +261,11 @@ def evaluate_qpu(backend, circuit, shots, rebuild=False):
         execution_time = depth * time_per_depth_per_shot
         execution_time *= shots
         estimates["waiting_time"] = None
-        
-        
+        ################## CODE FOR EXPERIMENTS ##########################
+        price = execution_time * 1.6
+        estimates["waiting_time"] = profile["average_time"]
+        ###################################################################
+       
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
@@ -264,7 +274,7 @@ def evaluate_qpu(backend, circuit, shots, rebuild=False):
     estimates["execution_time"] = execution_time
     estimates["cost"] = price
 
-    
+    return estimates
     with open(f"./cache/fake_estimates/{name}.json", "r") as f:
         estimates = json.loads(f.read())
         estimates["cost"] = shots * estimates["cost"]

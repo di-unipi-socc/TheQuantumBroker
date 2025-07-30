@@ -4,9 +4,10 @@
     "cost_weight": 1.0
   },
   "constraints": [
-    "sum(shots*cost) <= 3600",
-    "shots['fake_torino'] >= 100",
-    "min(fidelity) >= 0.8"
+    "sum(shots*cost) <= 750",
+    "shots['fake_torino'] >= 50",
+    "min(fidelity) >= 0.89",
+    "min(shots) >= 30"
   ],
   "objective": "sum(shots*cost)"
 }

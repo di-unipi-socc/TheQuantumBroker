@@ -1,4 +1,5 @@
 from typing import Dict, Any, List, Optional
+from qiskit import QuantumCircuit
 
 from intermediate_representation import IntermediateRepresentation
 from expression_parser import parse_expression_to_ir
@@ -7,12 +8,14 @@ class LinearProblemModel:
     def __init__(
         self,
         backends: Dict[str, Dict[str, Any]],
+        circuit: QuantumCircuit,
         total_shots: int,
         weights: Dict[str, float],
         constraints: List[str],  # list of constraint expressions
         objective: str           # objective expression as a string
     ):
         self.backends = backends  # {backend_name: {cost, execution_time, waiting_time, fidelity, ...}}
+        self.circuit = circuit
         self.total_shots = total_shots
         self.weights = weights
         self.ir = IntermediateRepresentation()

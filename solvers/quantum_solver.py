@@ -2,6 +2,9 @@ from typing import Dict, Any
 from linear_problem_model import LinearProblemModel, SolverInterface
 from expression_utils import preprocess_expression, build_full_context
 from expression_parser import safe_eval
+from evaluator import evaluate_qpu
+from quantum_executor import VirtualProvider
+
 
 import re
 
@@ -60,6 +63,15 @@ def eval_minmax_aux(aux_map, kind, expr_inside, names, per_backend_values, weigh
     return min(values) if kind == "min" else max(values)
 
 class QuantumSolver(SolverInterface):
+    def __init__(self, virtual_provider, iterations=100):
+        if not virtual_provider:
+            raise ValueError("Virtual provider must be provided to the non linear solver.")
+        if not isinstance(virtual_provider, VirtualProvider):
+            raise TypeError("Virtual provider must be an instance of VirtualProvider.")
+        self.iterations = iterations
+
+        self.virtual_provider = virtual_provider
+
     def solve(self, model: LinearProblemModel) -> Dict[str, Any]:
         import numpy as np
         from scipy.optimize import dual_annealing
@@ -67,32 +79,39 @@ class QuantumSolver(SolverInterface):
 
         start = time.perf_counter()
         backends = model.backends
+        circuit = model.circuit
         total_shots = model.total_shots
         weights = model.weights
         constraints = [c.expression for c in model.ir.constraints]
         objective_expr = model.ir.objective.expression if model.ir.objective else None
 
-        names = list(backends.keys())
+        providers_list = list(backends.keys())
+        providers_map = {backend: provider for provider in backends for backend in backends[provider].keys()}
+        names = [name for provider in providers_list for name in backends[provider].keys()]
         n = len(names)
         processed_constraints = preprocess_all_exprs(constraints, names)
         processed_objective = preprocess_expression(objective_expr, names) if objective_expr else None
 
-        def build_values(x):
+        def build_values(x):    
             shots_arr = np.round(np.array(x) / np.sum(x) * total_shots).astype(int)
             used_arr = (shots_arr > 0).astype(int)
             return shots_arr, used_arr
-
+    
         def evaluate(x):
             if np.any(np.array(x) < 0) or np.sum(x) == 0:
                 return 1e12
             shots_arr, used_arr = build_values(x)
+            names_estimates = {}
+            for i, name in enumerate(names):
+                names_estimates[name] = evaluate_qpu(self.virtual_provider.get_backend(providers_map[name],name),circuit, shots_arr[i])
+
             per_backend_values = {
                 "shots": {name: shots_arr[i] for i, name in enumerate(names)},
                 "used": {name: used_arr[i] for i, name in enumerate(names)},
-                "cost": {name: backends[name]["cost"] for name in names},
-                "execution_time": {name: backends[name]["execution_time"] for name in names},
-                "waiting_time": {name: backends[name]["waiting_time"] for name in names},
-                "fidelity": {name: backends[name]["fidelity"] * used_arr[i] + (1 - used_arr[i]) * 1e6 for i, name in enumerate(names)},
+                "cost": {name: names_estimates[name]["cost"] for name in names},
+                "execution_time": {name: names_estimates[name]["execution_time"] for name in names},
+                "waiting_time": {name: names_estimates[name]["waiting_time"] for name in names},
+                "fidelity": {name: names_estimates[name]["fidelity"] * used_arr[i] + (1 - used_arr[i]) * 1e6 for i, name in enumerate(names)},
             }
             ctx = build_full_context(names, per_backend_values, weights, total_shots)
 
@@ -127,13 +146,13 @@ class QuantumSolver(SolverInterface):
 
         for _ in range(10):
             x0 = np.random.uniform(0.1, 1.0, n)
-            result = dual_annealing(evaluate, bounds, x0=x0, maxiter=100)
+            result = dual_annealing(evaluate, bounds, x0=x0, maxiter=self.iterations)
             if result.success:
                 if best_obj is None or result.fun < best_obj:
                     best_x = result.x
                     best_obj = result.fun
 
-        if best_x is None:
+        if best_x is None or best_obj is None or best_obj >= 1e12:
             end = time.perf_counter()
             return {
                 "status": "no_solution_found",
@@ -145,13 +164,16 @@ class QuantumSolver(SolverInterface):
         shots_arr, used_arr = build_values(best_x)
         shot_vals = {name: int(shots_arr[i]) for i, name in enumerate(names)}
         used_vals = {name: int(used_arr[i]) for i, name in enumerate(names)}
+        names_estimates = {}
+        for i, name in enumerate(names):
+            names_estimates[name] = evaluate_qpu(self.virtual_provider.get_backend(providers_map[name],name),circuit, shots_arr[i])
         per_backend_values = {
-            "shots": shot_vals,
-            "used": used_vals,
-            "cost": {name: backends[name]["cost"] for name in names},
-            "execution_time": {name: backends[name]["execution_time"] for name in names},
-            "waiting_time": {name: backends[name]["waiting_time"] for name in names},
-            "fidelity": {name: backends[name]["fidelity"] * used_vals[name] + (1 - used_vals[name]) * 1e6 for name in names},
+            "shots": {name: shots_arr[i] for i, name in enumerate(names)},
+            "used": {name: used_arr[i] for i, name in enumerate(names)},
+            "cost": {name: names_estimates[name]["cost"] for name in names},
+            "execution_time": {name: names_estimates[name]["execution_time"] for name in names},
+            "waiting_time": {name: names_estimates[name]["waiting_time"] for name in names},
+            "fidelity": {name: names_estimates[name]["fidelity"] * used_arr[i] + (1 - used_arr[i]) * 1e6 for i, name in enumerate(names)},
         }
         ctx_sol = build_full_context(names, per_backend_values, weights, total_shots)
 
@@ -176,11 +198,19 @@ class QuantumSolver(SolverInterface):
             recomputed_obj = None
 
         end = time.perf_counter()
+
+        def build_dispatch():
+            dispatch = {}
+            for i, name in enumerate(names):
+                if shot_vals[name] > 0:
+                    dispatch.setdefault(providers_map[name], {}).setdefault(name, []).append({
+                        "circuit": circuit,
+                        "shots": shot_vals[name],
+                    })
+            return dispatch
         return {
             "status": "solution_found",
-            "shots": shot_vals,
-            "used": used_vals,
-            "objective": best_obj,
-            "objective_recomputed": recomputed_obj,
+            "dispatch": build_dispatch(),
+            "objective": recomputed_obj,
             "solver_exec_time": end - start,
         }

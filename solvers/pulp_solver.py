@@ -22,13 +22,15 @@ class PulpSolver(SolverInterface):
 
         start = time.perf_counter()
         backends = model.backends
+        circuit = model.circuit
         total_shots = model.total_shots
         weights = model.weights
         constraints = [c.expression for c in model.ir.constraints]
         objective_expr = model.ir.objective.expression if model.ir.objective else None
 
-        names = list(backends.keys())
-        estimates = {name: backends[name] for name in names}
+        providers = list(backends.keys())
+        names = [name for provider in providers for name in backends[provider].keys()]
+        estimates = {name: backends[provider][name] for provider in providers for name in backends[provider].keys()}
 
         # -- Variables --
         shots = {name: pulp.LpVariable(f"{name}_shots", lowBound=0, cat="Integer") for name in names}
@@ -184,7 +186,7 @@ class PulpSolver(SolverInterface):
 
         shot_vals = {name: shots[name].varValue for name in names}
         used_vals = {name: used[name].varValue for name in names}
-        status = pulp.LpStatus[prob.status]
+        status = "solution_found" if pulp.LpStatus[prob.status] == "Optimal" else "no_solution_found"
         obj_val = pulp.value(prob.objective)
         end = time.perf_counter()
 
@@ -210,9 +212,19 @@ class PulpSolver(SolverInterface):
         except Exception:
             recomputed_obj = None
 
+        def created_dispatch(backends, shot_vals):
+            dispatch = {}
+            for provider, backend in backends.items():
+                dispatch[provider] = {}
+                for name in backend.keys():
+                    if shot_vals[name] != 0:
+                        dispatch[provider][name] = [{"circuit": circuit, "shots": int(shot_vals[name])}]
+            return dispatch
+
+        dispatch = created_dispatch(backends, shot_vals)
         return {
             "status": status,
-            "shots": shot_vals,
+            "dispatch": dispatch,
             "objective": recomputed_obj,
             "solver_exec_time": end - start,
         }
