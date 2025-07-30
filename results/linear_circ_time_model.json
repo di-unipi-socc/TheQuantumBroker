@@ -1,0 +1,43 @@
+{
+    "configuration": {
+        "SETTINGS": {
+            "shots": "1024",
+            "providers": "[[\"local_aer\", []]]",
+            "backends": "[[\"local_aer\", \"fake_torino\"], [\"local_aer\", \"fake_kyiv\"], [\"local_aer\", \"fake_sherbrooke\"], [\"local_aer\", \"fake_fez\"], [\"local_aer\", \"fake_marrakesh\"]]",
+            "circuit": "circ.qasm",
+            "optimizer": "linear",
+            "nonlinear_iterations": "50",
+            "result_folder": "results"
+        }
+    },
+    "model_file": "time_model.json",
+    "circuit_file": "circ.qasm",
+    "reasoner_results": {
+        "status": "solution_found",
+        "dispatch": {
+            "local_aer": {
+                "fake_kyiv": [
+                    {
+                        "circuit": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\n\nqreg q[2];\ncreg c[2];\n\nh q[0];\ncx q[0], q[1];\nmeasure q[0] -> c[0];\nmeasure q[1] -> c[1];\n",
+                        "shots": 1024
+                    }
+                ]
+            }
+        },
+        "objective": 9.2668391,
+        "solver_exec_time": 0.02752572800091002
+    },
+    "qexecution_time": 2.849090133997379,
+    "results": {
+        "local_aer": {
+            "fake_kyiv": [
+                {
+                    "00": 537,
+                    "01": 4,
+                    "10": 6,
+                    "11": 477
+                }
+            ]
+        }
+    }
+}

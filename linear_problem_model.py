@@ -8,7 +8,7 @@ class LinearProblemModel:
     def __init__(
         self,
         backends: Dict[str, Dict[str, Any]],
-        circuit: QuantumCircuit,
+        circuit: str,
         total_shots: int,
         weights: Dict[str, float],
         constraints: List[str],  # list of constraint expressions

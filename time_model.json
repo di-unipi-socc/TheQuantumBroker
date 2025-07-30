@@ -1,42 +1,11 @@
 {
-    "reasoner_results": {
-        "status": "solution_found",
-        "dispatch": {
-            "local_aer": {
-                "fake_torino": [
-                    {
-                        "circuit": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\n\nqreg q[2];\ncreg c[2];\n\nh q[0];\ncx q[0], q[1];\nmeasure q[0] -> c[0];\nmeasure q[1] -> c[1];\n",
-                        "shots": 50
-                    }
-                ],
-                "fake_kyiv": [
-                    {
-                        "circuit": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\n\nqreg q[2];\ncreg c[2];\n\nh q[0];\ncx q[0], q[1];\nmeasure q[0] -> c[0];\nmeasure q[1] -> c[1];\n",
-                        "shots": 974
-                    }
-                ]
-            }
-        },
-        "objective": 639.9056792736054,
-        "solver_exec_time": 0.010448936001921538
-    },
-    "execution_time": 7.313017780001246,
-    "results": {
-        "local_aer": {
-            "fake_torino": [
-                {
-                    "00": 25,
-                    "11": 25
-                }
-            ],
-            "fake_kyiv": [
-                {
-                    "00": 477,
-                    "01": 9,
-                    "10": 7,
-                    "11": 481
-                }
-            ]
-        }
-    }
+    "weights": {
+    "cost_weight": 1.0
+},
+ "constraints": [
+    "sum(shots*cost) <= 13000",
+    "min(shots) >= 200",
+    "min(fidelity) >= 0.9"
+],
+  "objective": "max(execution_time + waiting_time)"
 }

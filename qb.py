@@ -130,7 +130,7 @@ if __name__ == "__main__":
     model = LinearProblemModel(
         backends=filtered_backends,
         circuit=circuit,
-        total_shots=params["total_shots"],
+        total_shots=shots,
         weights=params["weights"],
         constraints=params["constraints"],
         objective=params["objective"],
