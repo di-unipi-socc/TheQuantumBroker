@@ -1,8 +1,12 @@
 import sys, configparser, json, re, time, logging, os
 from linear_problem_model import LinearProblemModel
 from solvers import PulpSolver, QuantumSolver
-from evaluator import evaluate_qpu_single_shot
 from quantum_executor import QuantumExecutor, VirtualProvider, Dispatch
+
+#from evaluator import evaluate_qpu_single_shot
+#####Validation
+from evaluator_sim import evaluate_qpu_single_shot
+
 
 import sys
 logging.basicConfig(
@@ -57,6 +61,7 @@ if __name__ == "__main__":
     circuit_path = config.get("SETTINGS", "circuit", fallback="")
     optimizer = config.get("SETTINGS", "optimizer", fallback="linear")
     results_folder = config.get("SETTINGS", "result_folder", fallback="results")
+    execute_flag = config.getboolean("SETTINGS", "execute", fallback=False)
 
     if not providers:
         print("No providers specified in the config file. Please provide at least one provider.")
@@ -96,7 +101,8 @@ if __name__ == "__main__":
     # Build backends properties
     backends_props = build_backend_props(backends, virtual_provider, circuit)
     
-    # Build the linear problem model
+    # Check if fidelity threshold is specified in constraints
+    ##TODO: put this in the model and ask for it
     fidelity_threshold = None
     for c in params["constraints"]:
         m = re.match(r'\s*min\s*\(\s*fidelity\s*\)\s*>=\s*([0-9.]+)', c)
@@ -104,6 +110,14 @@ if __name__ == "__main__":
             fidelity_threshold = float(m.group(1))
             break
     
+    shots_threshold = 0
+    for c in params["constraints"]:
+        m = re.match(r'\s*min\s*\(\s*shots\s*\)\s*>=\s*([0-9.]+)', c)
+        if m:
+            shots_threshold = int(m.group(1))
+            break
+    
+
     # Filter backends based on fidelity threshold if specified
     if fidelity_threshold is not None:
         filtered_backends = filter_backends(backends_props, fidelity_threshold)
@@ -127,6 +141,10 @@ if __name__ == "__main__":
 
     logger.info(f"Creating the optimization model...")
 
+    ##TODO: put this in the model
+    if "weights" not in params:
+        params["weights"] = {"weight": 1.0}
+
     model = LinearProblemModel(
         backends=filtered_backends,
         circuit=circuit,
@@ -136,13 +154,14 @@ if __name__ == "__main__":
         objective=params["objective"],
     )
 
+
     logger.info(f"Instantiating the solver {optimizer}...")
 
     if optimizer == "linear":
         solver = PulpSolver()
     elif optimizer == "nonlinear":
         iterations = int(config.get("SETTINGS", "nonlinear_iterations", fallback=100))
-        solver = QuantumSolver(virtual_provider, iterations)
+        solver = QuantumSolver(virtual_provider, iterations, shots_threshold)
     else:
         print("Invalid optimizer. Options are: 'linear', 'nonlinear'")
         sys.exit(1)
@@ -154,13 +173,33 @@ if __name__ == "__main__":
     if reasoner_results["status"] != "solution_found":
         print("No solution found.")
         sys.exit(1)
-    
-    dispatch = Dispatch(reasoner_results["dispatch"])
+   
     
     logger.info(f"Dispatch created successfully.")
     logger.info(f"Reasoner time: {reasoner_results['solver_exec_time']:.2f} seconds")
 
     logger.info(f"Objective function score: {reasoner_results['objective']}")
+
+    if not execute_flag:
+        logger.info(f"Execution is disabled. Dispatch will not be executed.")
+        logger.info(f"Resulting dispatch: {reasoner_results['dispatch']}")
+        
+        if not os.path.exists(results_folder):
+            os.makedirs(results_folder)
+
+        results_file = f"{results_folder}/{optimizer}_{circuit_path.split('/')[-1].replace('.qasm', '')}_{model_path.split('/')[-1].replace('.json', '')}.json"
+        with open(results_file, "w") as f:
+            config_dict = {section: dict(config.items(section)) for section in config.sections()}
+            json.dump({
+                "configuration": config_dict,
+                "model_file": model_path,
+                "circuit_file": circuit_path,
+                "reasoner_results": reasoner_results
+            }, f, indent=4)
+        sys.exit(0)
+
+
+    dispatch = Dispatch(reasoner_results["dispatch"])
 
     logger.info(f"Executing the dispatch...")
     start = time.perf_counter()
@@ -175,7 +214,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(results_folder):
         os.makedirs(results_folder)
-    # the name of the JSON file of the results should be unique for circuit, backend, optimizer, model
+
     results_file = f"{results_folder}/{optimizer}_{circuit_path.split('/')[-1].replace('.qasm', '')}_{model_path.split('/')[-1].replace('.json', '')}.json"
     with open(results_file, "w") as f:
         config_dict = {section: dict(config.items(section)) for section in config.sections()}

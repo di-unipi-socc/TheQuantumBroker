@@ -5,6 +5,41 @@ from expression_parser import safe_eval
 
 import re
 
+import re
+
+def expand_sum_products(expr, backend_names):
+    # 1. Expand inside aggregates (original logic)
+    agg_pattern = r'(sum|min|max)\(\[(.*?)\]\)'
+    def agg_repl(match):
+        agg, items = match.groups()
+        items = re.sub(r'cost\["([^"]+)"\]',    lambda m: f'cost["{m.group(1)}"]*shots["{m.group(1)}"]', items)
+        items = re.sub(r'execution_time\["([^"]+)"\]', lambda m: f'execution_time["{m.group(1)}"]*shots["{m.group(1)}"]', items)
+        items = re.sub(r'waiting_time\["([^"]+)"\]', lambda m: f'waiting_time["{m.group(1)}"]*used["{m.group(1)}"]', items)
+        return f"{agg}([{items}])"
+    expr = re.sub(agg_pattern, agg_repl, expr, flags=re.DOTALL)
+
+    # 2. Expand bare variables everywhere outside [] and "", using negative lookahead and lookbehind
+    def expand_bare_var(var, template):
+        # match bare var NOT followed by [ or " (not already indexed)
+        return re.sub(
+            rf'(?<![\"\[\w])\b{var}\b(?![\[\"\w])',
+            template,
+            expr
+        )
+    
+    # Build the sum expressions for each
+    cost_sum = f"sum([{', '.join([f'cost[\"{name}\"]*shots[\"{name}\"]' for name in backend_names])}])"
+    exec_sum = f"sum([{', '.join([f'execution_time[\"{name}\"]*shots[\"{name}\"]' for name in backend_names])}])"
+    wait_sum = f"sum([{', '.join([f'waiting_time[\"{name}\"]*used[\"{name}\"]' for name in backend_names])}])"
+
+    # Expand all three in order: execution_time, waiting_time, cost
+    expr = expand_bare_var('execution_time', exec_sum)
+    expr = expand_bare_var('waiting_time', wait_sum)
+    expr = expand_bare_var('cost', cost_sum)
+
+    return expr
+
+
 def preprocess_all_exprs(exprs, names):
     result = []
     for expr in exprs:
@@ -12,6 +47,7 @@ def preprocess_all_exprs(exprs, names):
         if isinstance(processed, list):
             result.extend(processed)
         else:
+            processed = expand_sum_products(processed, names)
             result.append(processed)
     return result
 
@@ -49,6 +85,8 @@ class PulpSolver(SolverInterface):
         # -- Constraints and objective from preprocessor --
         processed_constraints = preprocess_all_exprs(constraints, names)
         processed_objective = preprocess_expression(objective_expr, names) if objective_expr else None
+        if processed_objective is not None and isinstance(processed_objective, str):
+            processed_objective = expand_sum_products(processed_objective, names)
 
         aux_vars = {}
         found_minmax = []
@@ -170,6 +208,7 @@ class PulpSolver(SolverInterface):
                 "waiting_time": {name: estimates[name]["waiting_time"] for name in names},
                 "fidelity": {name: estimates[name]["fidelity"] * used[name] + (1 - used[name]) * 1e6 for name in names},
             }
+            
             ctx = build_full_context(names, per_backend_values, weights, total_shots)
             for name in names:
                 ctx["shots"][name] = shots[name]

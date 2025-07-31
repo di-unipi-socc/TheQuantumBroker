@@ -37,7 +37,6 @@ def preprocess_expression(expr, names, backend_vars=BACKEND_VARS):
     expr = re.sub(r"(\w+)\['([^']+)'\]", r'\1["\2"]', expr)
     expr = re.sub(r"(\w+)\[`([^\`]+)`\]", r'\1["\2"]', expr)
 
-    # Patch min(fidelity) with big-M trick for "min among used"
     expr = re.sub(
         r'min\s*\(\s*fidelity\s*\)(?!\s*\[)',
         "min([" + ", ".join(

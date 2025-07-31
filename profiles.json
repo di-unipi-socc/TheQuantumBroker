@@ -1,0 +1,31 @@
+{
+    "fake_torino":{
+        "time_per_shot_per_depth": 0.06,
+        "waiting_time": 750,
+        "error_per_depth": 0.015
+    },
+    "fake_kyiv":{
+        "time_per_shot_per_depth": 0.05,
+        "waiting_time": 900,
+        "error_per_depth": 0.020
+    },
+    
+    "fake_sherbrooke":{
+        "time_per_shot_per_depth": 0.10,
+        "waiting_time": 850,
+        "error_per_depth": 0.016
+    },
+
+    "fake_fez":{
+        "time_per_shot_per_depth": 0.10,
+        "waiting_time": 100,
+        "error_per_depth": 0.018
+    },
+
+    "fake_marrakesh":{
+        "time_per_shot_per_depth": 0.08,
+        "waiting_time": 850,
+        "error_per_depth": 0.010
+    }
+
+}

@@ -5,7 +5,8 @@
     "constraints": [
         "sum(shots*cost) <= 13000",
         "min(shots) >= 200",
-        "max(execution_time + waiting_time) <= 1000"
+        "max(execution_time + waiting_time) <= 10000",
+        "sum(used) >=3"
     ],
-  "objective": "min(fidelity)"
+  "objective": "max(fidelity)"
 }

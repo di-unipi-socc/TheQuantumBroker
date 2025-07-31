@@ -5,7 +5,7 @@
             "providers": "[[\"local_aer\", []]]",
             "backends": "[[\"local_aer\", \"fake_torino\"], [\"local_aer\", \"fake_kyiv\"], [\"local_aer\", \"fake_sherbrooke\"], [\"local_aer\", \"fake_fez\"], [\"local_aer\", \"fake_marrakesh\"]]",
             "circuit": "circ.qasm",
-            "optimizer": "linear",
+            "optimizer": "nonlinear",
             "nonlinear_iterations": "50",
             "result_folder": "results",
             "execute": "False"
@@ -26,6 +26,6 @@
             }
         },
         "objective": 614.616,
-        "solver_exec_time": 0.014404816000023857
+        "solver_exec_time": 16.83444679099921
     }
 }

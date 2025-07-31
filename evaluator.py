@@ -199,6 +199,13 @@ def evaluate_qpu_single_shot(backend, circuit, rebuild=False):
     
 
 def evaluate_qpu(backend, circuit, shots, rebuild=False):
+    if shots <= 0:
+        return {
+            "execution_time": 0,
+            "waiting_time": 0,
+            "cost": 0,
+            "fidelity": 0,
+        }
     profile = {}
     if not rebuild:
         data = get_from_cache(backend)
