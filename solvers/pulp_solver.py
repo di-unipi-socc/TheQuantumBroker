@@ -5,16 +5,14 @@ from expression_parser import safe_eval
 
 import re
 
-import re
-
 def expand_sum_products(expr, backend_names):
-    # 1. Expand inside aggregates (original logic)
     agg_pattern = r'(sum|min|max)\(\[(.*?)\]\)'
     def agg_repl(match):
         agg, items = match.groups()
         items = re.sub(r'cost\["([^"]+)"\]',    lambda m: f'cost["{m.group(1)}"]*shots["{m.group(1)}"]', items)
         items = re.sub(r'execution_time\["([^"]+)"\]', lambda m: f'execution_time["{m.group(1)}"]*shots["{m.group(1)}"]', items)
         items = re.sub(r'waiting_time\["([^"]+)"\]', lambda m: f'waiting_time["{m.group(1)}"]*used["{m.group(1)}"]', items)
+        #items = re.sub(r'fidelity\["([^"]+)"\]', lambda m: f'fidelity["{m.group(1)}"]*used["{m.group(1)}"]', items)
         return f"{agg}([{items}])"
     expr = re.sub(agg_pattern, agg_repl, expr, flags=re.DOTALL)
 
@@ -39,7 +37,27 @@ def expand_sum_products(expr, backend_names):
 
     return expr
 
+def expand_sum_products_evaluator(expr, backend_names):
+    agg_pattern = r'(sum|min|max)\(\[(.*?)\]\)'
+    def agg_repl(match):
+        agg, items = match.groups()
+        items = re.sub(r'(\*shots\["[^"]+"\]|\*used\["[^"]+"\])', '', items)
+        return f"{agg}([{items}])"
+    expr = re.sub(agg_pattern, agg_repl, expr, flags=re.DOTALL)
 
+    def expand_bare_var(var):
+        sum_expr = f"sum([{', '.join([f'{var}[\"{name}\"]' for name in backend_names])}])"
+        return re.sub(
+            rf'(?<![\"\[\w])\b{var}\b(?![\[\"\w])',
+            sum_expr,
+            expr
+        )
+
+    expr = expand_bare_var('execution_time')
+    expr = expand_bare_var('waiting_time')
+    expr = expand_bare_var('cost')
+
+    return expr
 def preprocess_all_exprs(exprs, names):
     result = []
     for expr in exprs:
@@ -52,6 +70,11 @@ def preprocess_all_exprs(exprs, names):
     return result
 
 class PulpSolver(SolverInterface):
+
+    def __init__(self, virtual_provider, evaluator):
+        self.virtual_provider = virtual_provider
+        self.evaluator = evaluator
+
     def solve(self, model: LinearProblemModel) -> Dict[str, Any]:
         import pulp
         import time
@@ -67,6 +90,7 @@ class PulpSolver(SolverInterface):
         providers = list(backends.keys())
         names = [name for provider in providers for name in backends[provider].keys()]
         estimates = {name: backends[provider][name] for provider in providers for name in backends[provider].keys()}
+        print(f"Estimates: {estimates}")  # Debugging line
 
         # -- Variables --
         shots = {name: pulp.LpVariable(f"{name}_shots", lowBound=0, cat="Integer") for name in names}
@@ -87,6 +111,7 @@ class PulpSolver(SolverInterface):
         processed_objective = preprocess_expression(objective_expr, names) if objective_expr else None
         if processed_objective is not None and isinstance(processed_objective, str):
             processed_objective = expand_sum_products(processed_objective, names)
+            evaluator_ojective = expand_sum_products_evaluator(processed_objective, names)
 
         aux_vars = {}
         found_minmax = []
@@ -112,7 +137,7 @@ class PulpSolver(SolverInterface):
                     ctx.setdefault("cost", {})[name] = estimates[name]["cost"]
                     ctx.setdefault("execution_time", {})[name] = estimates[name]["execution_time"]
                     ctx.setdefault("waiting_time", {})[name] = estimates[name]["waiting_time"]
-                    ctx.setdefault("fidelity", {})[name] = estimates[name]["fidelity"]  # <-- Only the number!
+                    ctx.setdefault("fidelity", {})[name] = estimates[name]["fidelity"] 
 
                 # If weights/total_shots are needed:
                 if weights:
@@ -162,7 +187,7 @@ class PulpSolver(SolverInterface):
                 "cost": {name: estimates[name]["cost"] for name in names},
                 "execution_time": {name: estimates[name]["execution_time"] for name in names},
                 "waiting_time": {name: estimates[name]["waiting_time"] for name in names},
-                "fidelity": {name: estimates[name]["fidelity"] * used[name] + (1 - used[name]) * 1e6 for name in names},
+                "fidelity": {name: estimates[name]["fidelity"] * used[name] for name in names},
             }
             ctx = build_full_context(names, per_backend_values, weights, total_shots)
             for name in names:
@@ -206,7 +231,7 @@ class PulpSolver(SolverInterface):
                 "cost": {name: estimates[name]["cost"] for name in names},
                 "execution_time": {name: estimates[name]["execution_time"] for name in names},
                 "waiting_time": {name: estimates[name]["waiting_time"] for name in names},
-                "fidelity": {name: estimates[name]["fidelity"] * used[name] + (1 - used[name]) * 1e6 for name in names},
+                "fidelity": {name: estimates[name]["fidelity"] for name in names},
             }
             
             ctx = build_full_context(names, per_backend_values, weights, total_shots)
@@ -218,32 +243,48 @@ class PulpSolver(SolverInterface):
             obj = safe_eval(expr_mod, ctx)
             prob += obj
 
-        #prob.writeLP("debug_model.lp")
+        prob.writeLP("debug_model.lp")
 
-        prob.solve(pulp.PULP_CBC_CMD(msg=False, gapRel=1e-8, timeLimit=300))
+        prob.solve(pulp.PULP_CBC_CMD(msg=False))
 
+        end = time.perf_counter()
 
         shot_vals = {name: shots[name].varValue for name in names}
         used_vals = {name: used[name].varValue for name in names}
         status = "solution_found" if pulp.LpStatus[prob.status] == "Optimal" else "no_solution_found"
-        obj_val = pulp.value(prob.objective)
-        end = time.perf_counter()
+        if status == "no_solution_found":
+            return {
+                "status": status,
+                "dispatch": {},
+                "objective": None,
+                "solver_exec_time": end - start,
+            }
 
+        if prob.objective:
+            obj_val = pulp.value(prob.objective)
+
+        providers_map = {backend: provider for provider in backends for backend in backends[provider].keys()}
+        names_estimates = {}
+        for i, name in enumerate(names):
+                names_estimates[name] = self.evaluator.evaluate_qpu(self.virtual_provider.get_backend(providers_map[name],name), shot_vals[name])
+         
         per_backend_values = {
-            "shots": shot_vals,
-            "used": used_vals,
-            "cost": {name: estimates[name]["cost"] for name in names},
-            "execution_time": {name: estimates[name]["execution_time"] for name in names},
-            "waiting_time": {name: estimates[name]["waiting_time"] for name in names},
-            "fidelity": {name: estimates[name]["fidelity"] * used_vals[name] + (1 - used_vals[name]) * 1e6 for name in names},
+            "shots": {name: shot_vals[name] for i, name in enumerate(names)},
+            "used": {name: used_vals[name] for i, name in enumerate(names)},
+            "cost": {name: names_estimates[name]["cost"] for name in names},
+            "execution_time": {name: names_estimates[name]["execution_time"] for name in names},
+            "waiting_time": {name: names_estimates[name]["waiting_time"] for name in names},
+            "fidelity": {name: names_estimates[name]["fidelity"] * used_vals[name] for name in names},
         }
+
         ctx_sol = build_full_context(names, per_backend_values, weights, total_shots)
         for name in names:
             ctx_sol["shots"][name] = shot_vals[name]
             ctx_sol["used"][name] = used_vals[name]
         for aux_var in aux_vars.values():
             ctx_sol[aux_var.name] = pulp.value(aux_var)
-        expr_mod_recomputed = processed_objective
+
+        expr_mod_recomputed = evaluator_ojective
         for key, aux_name, pattern in found_minmax:
             expr_mod_recomputed = re.sub(pattern, aux_name, expr_mod_recomputed)
         try:
@@ -264,6 +305,7 @@ class PulpSolver(SolverInterface):
         return {
             "status": status,
             "dispatch": dispatch,
-            "objective": recomputed_obj,
+            "objective": obj_val,
+            "score": recomputed_obj,
             "solver_exec_time": end - start,
         }

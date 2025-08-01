@@ -5,7 +5,7 @@ from quantum_executor import QuantumExecutor, VirtualProvider, Dispatch
 
 #from evaluator import evaluate_qpu_single_shot
 #####Validation
-from evaluator_sim import evaluate_qpu_single_shot
+from evaluator_sim import EvaluatorSim
 
 
 import sys
@@ -26,14 +26,15 @@ def filter_backends(backends, fidelity_threshold):
         raise ValueError("No backends meet the fidelity threshold.")
     return filtered_backends
 
-def build_backend_props(backends, virtual_provider, circuit):
-
+def build_backend_props(backends, virtual_provider, evaluator, shots):# -> dict[Any, Any]:
     backends_props = {}
     for provider, backend in backends:
         if provider not in backends_props:
             backends_props[provider] = {}
         _backend = virtual_provider.get_backend(provider, backend)
-        backends_props[provider][backend] = evaluate_qpu_single_shot(_backend, circuit)
+        backends_props[provider][backend] = evaluator.evaluate_qpu_single_shot(_backend)
+        backends_props[provider][backend]["fidelity"] = evaluator.fidelity(_backend, shots) # fidelity for total shots
+        logger.info(f"Fidelity of backend {provider}:{backend}: {backends_props[provider][backend]['fidelity']}")
     return backends_props
 
 if __name__ == "__main__":
@@ -99,8 +100,10 @@ if __name__ == "__main__":
     logger.info(f"Selecting the profiles for the backends...")
 
     # Build backends properties
-    backends_props = build_backend_props(backends, virtual_provider, circuit)
-    
+    evaluator = EvaluatorSim(circuit)
+
+    backends_props = build_backend_props(backends, virtual_provider, evaluator, shots)
+
     # Check if fidelity threshold is specified in constraints
     ##TODO: put this in the model and ask for it
     fidelity_threshold = None
@@ -108,6 +111,7 @@ if __name__ == "__main__":
         m = re.match(r'\s*min\s*\(\s*fidelity\s*\)\s*>=\s*([0-9.]+)', c)
         if m:
             fidelity_threshold = float(m.group(1))
+            del params["constraints"][params["constraints"].index(c)]  # Remove this constraint from the model
             break
     
     shots_threshold = 0
@@ -125,7 +129,7 @@ if __name__ == "__main__":
         filtered_backends = backends_props
 
     excluded_backends = []
-    # creating the list of excluded backends starting from the original backends and remoing the ones in filtered_backends
+    # creating the list of excluded backends starting from the original backends and removing the ones in filtered_backends
     for provider, backends in backends_props.items():
         for backend, props in backends.items():
             if provider not in filtered_backends or backend not in filtered_backends[provider]:
@@ -134,9 +138,9 @@ if __name__ == "__main__":
     if excluded_backends:
         logger.info(f"Excluding backends with insufficient fidelity: {", ".join(excluded_backends)}")
 
-
-    if not filtered_backends:
-        print("No backends meet the fidelity threshold. Please adjust the threshold or check the backend properties.")
+    
+    if all(len(filtered_backends[p]) == 0 for p in filtered_backends):
+        logger.error("No backends meet the fidelity threshold. Please adjust the threshold or check the backend properties.")
         sys.exit(1)
 
     logger.info(f"Creating the optimization model...")
@@ -158,10 +162,12 @@ if __name__ == "__main__":
     logger.info(f"Instantiating the solver {optimizer}...")
 
     if optimizer == "linear":
-        solver = PulpSolver()
+        solver = PulpSolver(virtual_provider, evaluator)
     elif optimizer == "nonlinear":
         iterations = int(config.get("SETTINGS", "nonlinear_iterations", fallback=100))
-        solver = QuantumSolver(virtual_provider, iterations, shots_threshold)
+        annealings = int(config.get("SETTINGS", "nonlinear_annealings", fallback=10))
+        logger.info(f"Using {annealings} dual annealings with {iterations} iterations for the nonlinear solver.")
+        solver = QuantumSolver(virtual_provider, evaluator, iterations, annealings, shots_threshold, )
     else:
         print("Invalid optimizer. Options are: 'linear', 'nonlinear'")
         sys.exit(1)
@@ -178,11 +184,18 @@ if __name__ == "__main__":
     logger.info(f"Dispatch created successfully.")
     logger.info(f"Reasoner time: {reasoner_results['solver_exec_time']:.2f} seconds")
 
-    logger.info(f"Objective function score: {reasoner_results['objective']}")
+    logger.info(f"Objective function score: {reasoner_results['score']:.4f}")
 
     if not execute_flag:
         logger.info(f"Execution is disabled. Dispatch will not be executed.")
-        logger.info(f"Resulting dispatch: {reasoner_results['dispatch']}")
+        dispatch_to_show = reasoner_results["dispatch"].copy()
+        #remove the circuit from the dispatch output
+        for provider, backends in dispatch_to_show.items():
+            for backend in backends:
+                for i, job in enumerate(backends[backend]):
+                    if "circuit" in job:
+                        del backends[backend][i]["circuit"]
+        logger.info(f"Dispatch to show: {dispatch_to_show}")     
         
         if not os.path.exists(results_folder):
             os.makedirs(results_folder)

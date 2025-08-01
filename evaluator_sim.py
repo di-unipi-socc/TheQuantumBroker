@@ -1,58 +1,96 @@
 import json
 import math
 from qbraid import transpile as qbraid_transpile
-
-def evaluate_qpu_single_shot(backend, circuit):
-    estimates = evaluate_qpu(backend, circuit, shots=1)
-    if "shots" in estimates:
-        del estimates["shots"]
-    return estimates
-
 from quantum_executor import QuantumExecutor
-def evaluate_qpu(backend, circuit, shots):
-    if shots <= 0:
-        return {
-            "execution_time": 0,
-            "waiting_time": 0,
-            "cost": 0,
-            "fidelity": 0,
-        }
-    circuit = qbraid_transpile(circuit, "qiskit")
 
-    with open("profiles.json", "r") as f:
-        profiles = json.load(f)
+class EvaluatorSim:
+    def __init__(self, circuit):
+        with open("profiles.json", "r") as f:
+            self.profiles = json.load(f)
+
+        self.circuit = qbraid_transpile(circuit, "qiskit")
+    
+    def get_profile(self, backend):
+        """
+        Retrieve the profile for a specific backend.
+        """
+        backend_name = backend.metadata().get("device_id").lower()
+        if backend_name not in self.profiles:
+            raise ValueError(f"Backend {backend_name} not found in profiles.json")
+        return self.profiles[backend_name]
+
+    def execution_time(self, backend, shots):
+        """
+        Calculate the execution time based on the profile and circuit.
+        """
+        circuit_depth = self.circuit.depth()
+
+        profile = self.get_profile(backend)
+        # Reading profile parameters
+        base_time = profile.get("base_time", 0)
+        time_per_shot_per_depth = profile.get("time_per_shot_per_depth", 0)
+
+        total_execution_time = time_per_shot_per_depth * circuit_depth * shots + base_time
+        return total_execution_time
+
+    def cost(self, backend, shots):
+        """
+        Calculate the cost based on the profile and circuit.
+        """
+        profile = self.get_profile(backend)
+        beta = 0.9 #discount factor
+
+        price_per_time = profile["price_per_time"]
+        total_execution_time = self.execution_time(backend, shots)
+        price = price_per_time * total_execution_time**beta
         
-    backend_name = backend.metadata().get("device_id").lower()
-    if backend_name not in profiles:
-        raise ValueError(f"Backend {backend_name} not found in profiles.json")
-    
-    profile = profiles[backend_name]
-    
-    circuit_depth = circuit.depth()
-    
-    
-    
-    time_per_shot_per_depth = profile["time_per_shot_per_depth"]
-    print("Time per shot per depth:", time_per_shot_per_depth)
-    print("Circuit depth:", circuit_depth)
-    total_execution_time = time_per_shot_per_depth * circuit_depth * shots
-    
-    waiting_time = profile["waiting_time"]
-    
-    price = total_execution_time * 1.6 # IBM model
+        return price
 
-    error_per_depth = profile["error_per_depth"]
-    fidelity_per_depth = 1.0 - error_per_depth
-    fidelity = math.pow(fidelity_per_depth, circuit_depth)
-    fidelity = max(0.0, min(1.0, fidelity))
-    fidelity = round(fidelity, 4)
+    def fidelity(self, backend, shots):
+        """
+        Calculate the fidelity based on the profile and circuit.
+        """
+        circuit_depth = self.circuit.depth()
+
+        # Reading profile parameters
+        profile = self.get_profile(backend)
+        error_per_depth = profile.get("error_per_depth", 0.01)  # Default error per depth if not specified
+
+        error_per_depth = math.pow(error_per_depth* circuit_depth, 2)
+        shots_factor = math.pow(1 / (2 * math.sqrt(shots)), 2)
+        fidelity = 1 - math.sqrt(error_per_depth + shots_factor)
+        return round(fidelity, 4)
+
+    def evaluate_qpu_single_shot(self, backend):
+        estimates = self.evaluate_qpu(backend, shots=1)
+        if "shots" in estimates:
+            del estimates["shots"]
+        return estimates
+
+    def evaluate_qpu(self, backend, shots):
+        if shots <= 0:
+            return {
+                "execution_time": 0,
+                "waiting_time": 0,
+                "cost": 0,
+                "fidelity": 0,
+            }
+
+        profile = self.get_profile(backend)
+
+        cost_value = self.cost(backend, shots)
+        execution_time_value = self.execution_time(backend, shots)
+        waiting_time_value = profile.get("waiting_time", 0)
+        fidelity_value = self.fidelity(backend, shots)
+
+        return {
+            "execution_time": execution_time_value,
+            "waiting_time": waiting_time_value,
+            "cost": cost_value,
+            "fidelity": fidelity_value,
+        }
     
-    return {
-        "execution_time": total_execution_time,
-        "waiting_time": waiting_time,
-        "cost": price,
-        "fidelity": fidelity,
-    }
+    
     
 if __name__ == "__main__":
     import sys
@@ -62,6 +100,9 @@ if __name__ == "__main__":
     circuit.h(0)
     circuit.cx(0, 1)
     circuit.measure_all()
+
+    with open("circ.qasm", "r") as f:
+        circuit = f.read()
     
     backend_name = sys.argv[1] if len(sys.argv) > 1 else "aer_simulator"
     shots = int(sys.argv[2]) if len(sys.argv) > 2 else 1024
@@ -69,8 +110,9 @@ if __name__ == "__main__":
     vp = qe.virtual_provider
     backend = vp.get_backend("local_aer",backend_name)
     
-    result = evaluate_qpu(backend, circuit, shots)
-    
+    evaluator = EvaluatorSim(circuit)
+    result = evaluator.evaluate_qpu(backend, shots)
+
     print("Evaluation Result:")
     print(json.dumps(result, indent=4))
     

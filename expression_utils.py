@@ -40,7 +40,7 @@ def preprocess_expression(expr, names, backend_vars=BACKEND_VARS):
     expr = re.sub(
         r'min\s*\(\s*fidelity\s*\)(?!\s*\[)',
         "min([" + ", ".join(
-            f'fidelity["{name}"] * used["{name}"] + (1 - used["{name}"]) * 1e6' for name in names
+            f'fidelity["{name}"] * used["{name}"]' for name in names
         ) + "])",
         expr
     )

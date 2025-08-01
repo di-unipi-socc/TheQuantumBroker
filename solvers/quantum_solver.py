@@ -6,7 +6,7 @@ from expression_parser import safe_eval
 from quantum_executor import VirtualProvider
 #####Validation
 #from evaluator import evaluate_qpu
-from evaluator_sim import evaluate_qpu
+from evaluator_sim import EvaluatorSim
 import re
 
 
@@ -96,15 +96,16 @@ def eval_minmax_aux(aux_map, kind, expr_inside, names, per_backend_values, weigh
     return min(values) if kind == "min" else max(values)
 
 class QuantumSolver(SolverInterface):
-    def __init__(self, virtual_provider, iterations=100, shots_threshold=0):
+    def __init__(self, virtual_provider, evaluator, iterations=100, annealings=10, shots_threshold=0):
         if not virtual_provider:
             raise ValueError("Virtual provider must be provided to the non linear solver.")
         if not isinstance(virtual_provider, VirtualProvider):
             raise TypeError("Virtual provider must be an instance of VirtualProvider.")
         self.iterations = iterations
+        self.annealings = annealings
         self.shots_threshold = shots_threshold
-
         self.virtual_provider = virtual_provider
+        self.evaluator = evaluator
 
     def solve(self, model: LinearProblemModel) -> Dict[str, Any]:
         import numpy as np
@@ -221,15 +222,15 @@ class QuantumSolver(SolverInterface):
             shots_arr, used_arr = build_values(x)
             names_estimates = {}
             for i, name in enumerate(names):
-                names_estimates[name] = evaluate_qpu(self.virtual_provider.get_backend(providers_map[name],name),circuit, shots_arr[i])
-            
+                names_estimates[name] = self.evaluator.evaluate_qpu(self.virtual_provider.get_backend(providers_map[name],name), shots_arr[i])
+
             per_backend_values = {
                 "shots": {name: shots_arr[i] for i, name in enumerate(names)},
                 "used": {name: used_arr[i] for i, name in enumerate(names)},
                 "cost": {name: names_estimates[name]["cost"] for name in names},
                 "execution_time": {name: names_estimates[name]["execution_time"] for name in names},
                 "waiting_time": {name: names_estimates[name]["waiting_time"] for name in names},
-                "fidelity": {name: names_estimates[name]["fidelity"] * used_arr[i] + (1 - used_arr[i]) * 1e6 for i, name in enumerate(names)},
+                "fidelity": {name: names_estimates[name]["fidelity"] * used_arr[i] for i, name in enumerate(names)},
             }
             ctx = build_full_context(names, per_backend_values, weights, total_shots)
 
@@ -272,7 +273,7 @@ class QuantumSolver(SolverInterface):
             except Exception:
                 best_x = np.random.uniform(0.1, 1.0, n)
 
-        for _ in range(10):
+        for _ in range(self.annealings):
             x0 = best_x if best_obj < 1e12 else np.random.uniform(0.1, 1.0, n)
             result = dual_annealing(evaluate, bounds, x0=x0, maxiter=self.iterations)
             if result.success:
@@ -295,7 +296,7 @@ class QuantumSolver(SolverInterface):
         used_vals = {name: int(used_arr[i]) for i, name in enumerate(names)}
         names_estimates = {}
         for i, name in enumerate(names):
-            names_estimates[name] = evaluate_qpu(self.virtual_provider.get_backend(providers_map[name],name),circuit, shots_arr[i])
+            names_estimates[name] = self.evaluator.evaluate_qpu(self.virtual_provider.get_backend(providers_map[name],name), shots_arr[i])
         per_backend_values = {
             "shots": {name: shots_arr[i] for i, name in enumerate(names)},
             "used": {name: used_arr[i] for i, name in enumerate(names)},
@@ -322,6 +323,8 @@ class QuantumSolver(SolverInterface):
         for key, value in aux_map.items():
             obj_expr_mod = obj_expr_mod.replace(key, str(value))
         try:
+            print(f"Recomputing objective with context: {ctx_sol}")
+            print(f"Objective expression: {obj_expr_mod}")
             recomputed_obj = safe_eval(obj_expr_mod, ctx_sol)
         except Exception:
             recomputed_obj = None
@@ -340,6 +343,6 @@ class QuantumSolver(SolverInterface):
         return {
             "status": "solution_found",
             "dispatch": build_dispatch(),
-            "objective": recomputed_obj,
+            "score": recomputed_obj,
             "solver_exec_time": end - start,
         }
