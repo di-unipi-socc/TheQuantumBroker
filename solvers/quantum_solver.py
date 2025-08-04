@@ -1,15 +1,12 @@
 from typing import Dict, Any
+import numpy as np
+from scipy.optimize import dual_annealing
+import time
 from itertools import product
 from linear_problem_model import LinearProblemModel, SolverInterface
 from expression_utils import preprocess_expression, build_full_context
 from expression_parser import safe_eval
 from quantum_executor import VirtualProvider
-#####Validation
-#from evaluator import evaluate_qpu
-from evaluator_sim import EvaluatorSim
-import re
-
-
 import re
 
 def expand_sum_products(expr, backend_names):
@@ -108,10 +105,6 @@ class QuantumSolver(SolverInterface):
         self.evaluator = evaluator
 
     def solve(self, model: LinearProblemModel) -> Dict[str, Any]:
-        import numpy as np
-        from scipy.optimize import dual_annealing
-        import time
-
         start = time.perf_counter()
         backends = model.backends
         circuit = model.circuit
@@ -293,7 +286,7 @@ class QuantumSolver(SolverInterface):
 
         shots_arr, used_arr = build_values(best_x)
         shot_vals = {name: int(shots_arr[i]) for i, name in enumerate(names)}
-        used_vals = {name: int(used_arr[i]) for i, name in enumerate(names)}
+        #used_vals = {name: int(used_arr[i]) for i, name in enumerate(names)}
         names_estimates = {}
         for i, name in enumerate(names):
             names_estimates[name] = self.evaluator.evaluate_qpu(self.virtual_provider.get_backend(providers_map[name],name), shots_arr[i])
@@ -323,8 +316,6 @@ class QuantumSolver(SolverInterface):
         for key, value in aux_map.items():
             obj_expr_mod = obj_expr_mod.replace(key, str(value))
         try:
-            print(f"Recomputing objective with context: {ctx_sol}")
-            print(f"Objective expression: {obj_expr_mod}")
             recomputed_obj = safe_eval(obj_expr_mod, ctx_sol)
         except Exception:
             recomputed_obj = None
@@ -344,5 +335,6 @@ class QuantumSolver(SolverInterface):
             "status": "solution_found",
             "dispatch": build_dispatch(),
             "score": recomputed_obj,
+            "evaluation": recomputed_obj,
             "solver_exec_time": end - start,
         }

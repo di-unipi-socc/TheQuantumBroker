@@ -3,7 +3,7 @@ import math
 from qbraid import transpile as qbraid_transpile
 from quantum_executor import QuantumExecutor
 
-class EvaluatorSim:
+class Evaluator:
     def __init__(self, circuit):
         with open("profiles.json", "r") as f:
             self.profiles = json.load(f)
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     vp = qe.virtual_provider
     backend = vp.get_backend("local_aer",backend_name)
     
-    evaluator = EvaluatorSim(circuit)
+    evaluator = Evaluator(circuit)
     result = evaluator.evaluate_qpu(backend, shots)
 
     print("Evaluation Result:")

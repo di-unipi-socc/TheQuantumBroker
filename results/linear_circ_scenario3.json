@@ -12,7 +12,7 @@
             "execute": "False"
         }
     },
-    "model_file": "test.json",
+    "model_file": "scenario3.json",
     "circuit_file": "circ.qasm",
     "reasoner_results": {
         "status": "solution_found",
@@ -20,28 +20,23 @@
             "local_aer": {
                 "fake_torino": [
                     {
-                        "shots": 2071
+                        "shots": 500
+                    }
+                ],
+                "fake_kyiv": [
+                    {
+                        "shots": 2043
                     }
                 ],
                 "fake_sherbrooke": [
                     {
-                        "shots": 100
-                    }
-                ],
-                "fake_fez": [
-                    {
-                        "shots": 1241
-                    }
-                ],
-                "fake_marrakesh": [
-                    {
-                        "shots": 684
+                        "shots": 1553
                     }
                 ]
             }
         },
-        "score": -1384.2470190633423,
-        "evaluation": -530.0526637738371,
-        "solver_exec_time": 0.01045673299995542
+        "score": 970.21,
+        "evaluation": 861.57,
+        "solver_exec_time": 0.011925517999770818
     }
 }

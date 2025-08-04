@@ -1,0 +1,14 @@
+
+{
+  "weights": {
+    "time_weight": 0.5,
+    "cost_weight": 0.5
+  },
+  "constraints": [
+    "sum(cost) <= 1500",
+    "min(shots) >= 300",
+    "min(fidelity) >= 0.9",
+    "max(execution_time + waiting_time) <= 800"
+  ],
+  "objective": "time_weight * max(execution_time + waiting_time) + cost_weight * sum(cost)"
+}

@@ -264,9 +264,9 @@ class PulpSolver(SolverInterface):
 
         providers_map = {backend: provider for provider in backends for backend in backends[provider].keys()}
         names_estimates = {}
-        for i, name in enumerate(names):
-                names_estimates[name] = self.evaluator.evaluate_qpu(self.virtual_provider.get_backend(providers_map[name],name), shot_vals[name])
-         
+        for _, name in enumerate(names):
+            names_estimates[name] = self.evaluator.evaluate_qpu(self.virtual_provider.get_backend(providers_map[name], name), shot_vals[name])
+
         per_backend_values = {
             "shots": {name: shot_vals[name] for i, name in enumerate(names)},
             "used": {name: used_vals[name] for i, name in enumerate(names)},
@@ -304,7 +304,7 @@ class PulpSolver(SolverInterface):
         return {
             "status": status,
             "dispatch": dispatch,
-            "objective": obj_val,
-            "score": recomputed_obj,
+            "score": obj_val,
+            "evaluation": recomputed_obj,
             "solver_exec_time": end - start,
         }

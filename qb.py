@@ -5,8 +5,7 @@ from quantum_executor import QuantumExecutor, VirtualProvider, Dispatch
 
 #from evaluator import evaluate_qpu_single_shot
 #####Validation
-from evaluator_sim import EvaluatorSim
-
+from evaluator_sim import Evaluator
 
 import sys
 logging.basicConfig(
@@ -100,7 +99,7 @@ if __name__ == "__main__":
     logger.info(f"Selecting the profiles for the backends...")
 
     # Build backends properties
-    evaluator = EvaluatorSim(circuit)
+    evaluator = Evaluator(circuit)
 
     backends_props = build_backend_props(backends, virtual_provider, evaluator, shots)
 
@@ -185,6 +184,7 @@ if __name__ == "__main__":
     logger.info(f"Reasoner time: {reasoner_results['solver_exec_time']:.2f} seconds")
 
     logger.info(f"Objective function score: {reasoner_results['score']:.4f}")
+    logger.info(f"Objective function evaluation: {reasoner_results['evaluation']:.4f}")
 
     if not execute_flag:
         logger.info(f"Execution is disabled. Dispatch will not be executed.")
