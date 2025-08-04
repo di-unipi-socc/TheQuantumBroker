@@ -1,0 +1,47 @@
+{
+    "configuration": {
+        "SETTINGS": {
+            "shots": "4096",
+            "providers": "[[\"local_aer\", []]]",
+            "backends": "[[\"local_aer\", \"fake_torino\"], [\"local_aer\", \"fake_kyiv\"], [\"local_aer\", \"fake_sherbrooke\"], [\"local_aer\", \"fake_fez\"], [\"local_aer\", \"fake_marrakesh\"]]",
+            "circuit": "circ.qasm",
+            "optimizer": "linear",
+            "nonlinear_iterations": "50",
+            "nonlinear_annealings": "20",
+            "result_folder": "results",
+            "execute": "False"
+        }
+    },
+    "model_file": "fidelity_model.json",
+    "circuit_file": "circ.qasm",
+    "reasoner_results": {
+        "status": "solution_found",
+        "dispatch": {
+            "local_aer": {
+                "fake_torino": [
+                    {
+                        "shots": 100
+                    }
+                ],
+                "fake_sherbrooke": [
+                    {
+                        "shots": 100
+                    }
+                ],
+                "fake_fez": [
+                    {
+                        "shots": 3796
+                    }
+                ],
+                "fake_marrakesh": [
+                    {
+                        "shots": 100
+                    }
+                ]
+            }
+        },
+        "objective": 0.9,
+        "score": 0.9,
+        "solver_exec_time": 0.008753983000019616
+    }
+}

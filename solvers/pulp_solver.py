@@ -90,7 +90,6 @@ class PulpSolver(SolverInterface):
         providers = list(backends.keys())
         names = [name for provider in providers for name in backends[provider].keys()]
         estimates = {name: backends[provider][name] for provider in providers for name in backends[provider].keys()}
-        print(f"Estimates: {estimates}")  # Debugging line
 
         # -- Variables --
         shots = {name: pulp.LpVariable(f"{name}_shots", lowBound=0, cat="Integer") for name in names}

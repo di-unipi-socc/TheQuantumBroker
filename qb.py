@@ -111,7 +111,7 @@ if __name__ == "__main__":
         m = re.match(r'\s*min\s*\(\s*fidelity\s*\)\s*>=\s*([0-9.]+)', c)
         if m:
             fidelity_threshold = float(m.group(1))
-            del params["constraints"][params["constraints"].index(c)]  # Remove this constraint from the model
+            #del params["constraints"][params["constraints"].index(c)]  # Remove this constraint from the model
             break
     
     shots_threshold = 0
