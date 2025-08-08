@@ -16,7 +16,7 @@ QB automates shot-wise distribution of quantum circuits, orchestrates workload e
 
 ## Architecture
 
-![Quantum Broker Architecture](docs/overview.pdf)
+![Quantum Broker Architecture](docs/qb.png)
 **Architecture Components:**
 
 - **Quantum Executor:** Handles shot-wise distribution and execution of quantum circuits.
