@@ -1,0 +1,80 @@
+{
+    "configuration": {
+        "shots": 4096,
+        "providers": [
+            [
+                "local_aer",
+                []
+            ]
+        ],
+        "backends": [
+            [
+                "local_aer",
+                "fake_torino"
+            ],
+            [
+                "local_aer",
+                "fake_kyiv"
+            ],
+            [
+                "local_aer",
+                "fake_sherbrooke"
+            ],
+            [
+                "local_aer",
+                "fake_fez"
+            ],
+            [
+                "local_aer",
+                "fake_marrakesh"
+            ]
+        ],
+        "optimizer": "linear",
+        "results_folder": "results",
+        "execute_flag": false,
+        "algorithm": "vqe",
+        "size": 6,
+        "circuit_name": "vqe_6",
+        "qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\ngate gate_RealAmplitudes(param0,param1,param2,param3,param4,param5,param6,param7,param8,param9,param10,param11,param12,param13,param14,param15,param16,param17) q0,q1,q2,q3,q4,q5 { ry(-pi) q0; ry(1.735330811079437) q1; ry(-1.2047945757857885) q2; ry(-2.0592443681573354) q3; ry(2.9909615803920646) q4; ry(3.1407607902757513) q5; cx q4,q5; cx q3,q4; cx q2,q3; cx q1,q2; cx q0,q1; ry(3.0733355901955717) q0; ry(1.5705807814935222) q1; ry(1.570821876130234) q2; ry(1.570671358665548) q3; ry(-1.5707829432712181) q4; ry(-1.5713837258521617) q5; cx q4,q5; cx q3,q4; cx q2,q3; cx q1,q2; cx q0,q1; ry(0.06811066920591602) q0; ry(1.5705998239563892) q1; ry(2.977326379676474) q2; ry(-0.3660442155911267) q3; ry(-0.48834065067612653) q4; ry(1.4201801612507492) q5; }\nqreg q[6];\ncreg meas[6];\ngate_RealAmplitudes(-pi,1.735330811079437,-1.2047945757857885,-2.0592443681573354,2.9909615803920646,3.1407607902757513,3.0733355901955717,1.5705807814935222,1.570821876130234,1.570671358665548,-1.5707829432712181,-1.5713837258521617,0.06811066920591602,1.5705998239563892,2.977326379676474,-0.3660442155911267,-0.48834065067612653,1.4201801612507492) q[0],q[1],q[2],q[3],q[4],q[5];\nbarrier q[0],q[1],q[2],q[3],q[4],q[5];\nmeasure q[0] -> meas[0];\nmeasure q[1] -> meas[1];\nmeasure q[2] -> meas[2];\nmeasure q[3] -> meas[3];\nmeasure q[4] -> meas[4];\nmeasure q[5] -> meas[5];"
+    },
+    "model_file": "scenario1.json",
+    "circuit_name": "vqe_6",
+    "reasoner_results": {
+        "status": "solution_found",
+        "dispatch": {
+            "local_aer": {
+                "fake_torino": [
+                    {
+                        "shots": 300
+                    }
+                ],
+                "fake_kyiv": [
+                    {
+                        "shots": 1221
+                    }
+                ],
+                "fake_sherbrooke": [
+                    {
+                        "shots": 968
+                    }
+                ],
+                "fake_fez": [
+                    {
+                        "shots": 300
+                    }
+                ],
+                "fake_marrakesh": [
+                    {
+                        "shots": 1307
+                    }
+                ]
+            }
+        },
+        "score": 418.6786413938874,
+        "evaluation": 233.0325441352035,
+        "solver_exec_time": 0.01796417100013059,
+        "total_cost": 171.90508827040702,
+        "max_time": 294.15999999999997,
+        "min_fidelity": 0.9539
+    }
+}

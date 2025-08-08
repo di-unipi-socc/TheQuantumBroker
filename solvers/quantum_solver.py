@@ -265,17 +265,16 @@ class QuantumSolver(SolverInterface):
                     best_obj = obj
             except Exception:
                 best_x = np.random.uniform(0.1, 1.0, n)
-
-        for _ in range(self.annealings):
-            x0 = best_x if best_obj < 1e12 else np.random.uniform(0.1, 1.0, n)
-            result = dual_annealing(evaluate, bounds, x0=x0, maxiter=self.iterations)
-            if result.success:
-                if best_obj is None or result.fun < best_obj:
-                    best_x = result.x
-                    best_obj = result.fun
+        if len(names) > 1:
+            for _ in range(self.annealings):
+                x0 = best_x if best_obj < 1e12 else np.random.uniform(0.1, 1.0, n)
+                result = dual_annealing(evaluate, bounds, x0=x0, maxiter=self.iterations)
+                if result.success:
+                    if best_obj is None or result.fun < best_obj:
+                        best_x = result.x
+                        best_obj = result.fun
 
         if best_x is None or best_obj is None or best_obj >= 1e12:
-            print(f"Best_x: {best_x}, Best_obj: {best_obj}")
             end = time.perf_counter()
             return {
                 "status": "no_solution_found",
@@ -331,10 +330,17 @@ class QuantumSolver(SolverInterface):
                         "shots": shot_vals[name],
                     })
             return dispatch
+        total_cost = sum(per_backend_values["cost"].values())
+        max_time = max(per_backend_values["execution_time"][name] + per_backend_values["waiting_time"][name] for name in names)
+        min_fidelity = min(per_backend_values["fidelity"][name] for name in names if used_arr[names.index(name)] > 0)
+
         return {
             "status": "solution_found",
             "dispatch": build_dispatch(),
             "score": recomputed_obj,
             "evaluation": recomputed_obj,
             "solver_exec_time": end - start,
+            "total_cost": total_cost,
+            "max_time": max_time,
+            "min_fidelity": min_fidelity,
         }

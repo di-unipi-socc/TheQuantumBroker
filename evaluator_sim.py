@@ -5,7 +5,7 @@ from quantum_executor import QuantumExecutor
 
 class Evaluator:
     def __init__(self, circuit):
-        with open("profiles.json", "r") as f:
+        with open("cache/simulator_profiles.json", "r") as f:
             self.profiles = json.load(f)
 
         self.circuit = qbraid_transpile(circuit, "qiskit")

@@ -242,7 +242,7 @@ class PulpSolver(SolverInterface):
             obj = safe_eval(expr_mod, ctx)
             prob += obj
 
-        prob.writeLP("debug_model.lp")
+        #prob.writeLP("debug_model.lp")
 
         prob.solve(pulp.PULP_CBC_CMD(msg=False))
 
@@ -301,10 +301,18 @@ class PulpSolver(SolverInterface):
             return dispatch
 
         dispatch = created_dispatch(backends, shot_vals)
+
+        total_cost = sum(per_backend_values["cost"].values())
+        max_time = max(per_backend_values["execution_time"][name] + per_backend_values["waiting_time"][name] for name in names)
+        min_fidelity = min(per_backend_values["fidelity"][name] for name in names if used_vals[name] > 0)
+
         return {
             "status": status,
             "dispatch": dispatch,
             "score": obj_val,
             "evaluation": recomputed_obj,
             "solver_exec_time": end - start,
+            "total_cost": total_cost,
+            "max_time": max_time,
+            "min_fidelity": min_fidelity,
         }

@@ -1,8 +1,8 @@
 
 {
   "constraints": [
-    "shots['fake_torino'] >= 500",
-    "sum(cost) <= 800"
+    "shots['fake_torino'] >= 700",
+    "sum(cost) <= 700"
   ],
   "objective": "max(execution_time + waiting_time)"
 }

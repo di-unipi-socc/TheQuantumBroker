@@ -268,10 +268,6 @@ def evaluate_qpu(backend, circuit, shots, rebuild=False):
         execution_time = depth * time_per_depth_per_shot
         execution_time *= shots
         estimates["waiting_time"] = None
-        ################## CODE FOR EXPERIMENTS ##########################
-        price = execution_time * 1.6
-        estimates["waiting_time"] = profile["average_time"]
-        ###################################################################
        
     else:
         raise ValueError(f"Unknown provider: {provider}")
@@ -280,12 +276,5 @@ def evaluate_qpu(backend, circuit, shots, rebuild=False):
 
     estimates["execution_time"] = execution_time
     estimates["cost"] = price
-
-    return estimates
-    with open(f"./cache/fake_estimates/{name}.json", "r") as f:
-        estimates = json.loads(f.read())
-        estimates["cost"] = shots * estimates["cost"]
-        estimates["execution_time"] = shots * estimates["execution_time"]
-        estimates["shots"] = shots
 
     return estimates
