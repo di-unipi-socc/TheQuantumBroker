@@ -1,3 +1,4 @@
-- Put in the profiles maximum and minum values to allow normalization in the models.
+- Evaluator: same interface of EvaluatorSim and flag to QB to decide which use
+- Put in the profiles maximum and minimum values to allow normalization in the models.
 - Fidelity evaluation is static, consider making it dynamic based on backend properties.
 - Update the model representation as per the TODOs in the code of the `run_qb` function.
