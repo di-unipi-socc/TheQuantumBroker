@@ -19,9 +19,9 @@ QB automates shot-wise distribution of quantum circuits, orchestrates workload e
 ![Quantum Broker Architecture](docs/qb.png)
 **Architecture Components:**
 
-- **Quantum Executor:** Handles shot-wise distribution and execution of quantum circuits.
 - **Profiler:** Characterizes backend properties (e.g., fidelity, cost, queue time) via live/static profiling.
 - **Reasoner:** Makes adaptive, QoS-driven decisions for backend selection and workload distribution.
+- **Quantum Executor:** Handles shot-wise distribution and execution of quantum circuits.
 
 
 ## Supported Providers
