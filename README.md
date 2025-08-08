@@ -16,30 +16,13 @@ QB automates shot-wise distribution of quantum circuits, orchestrates workload e
 
 ## Architecture
 
-See [`docs/overview.pdf`](docs/overview.pdf) for the full architecture diagram.
+![Quantum Broker Architecture](docs/overview.pdf)
+**Architecture Components:**
 
-```mermaid
-flowchart TD
-    User["User"]
-    Config["Config File"]
-    Model["Model File"]
-    QB["Quantum Broker"]
-    Executor["Quantum Executor"]
-    Profiler["Profiler"]
-    Reasoner["Reasoner"]
-    QPU["Quantum Providers"]
+- **Quantum Executor:** Handles shot-wise distribution and execution of quantum circuits.
+- **Profiler:** Characterizes backend properties (e.g., fidelity, cost, queue time) via live/static profiling.
+- **Reasoner:** Makes adaptive, QoS-driven decisions for backend selection and workload distribution.
 
-    User --> Config
-    User --> Model
-    Config --> QB
-    Model --> QB
-    QB --> Executor
-    QB --> Profiler
-    QB --> Reasoner
-    Executor --> QPU
-    Profiler --> QPU
-    Reasoner --> Executor
-```
 
 ## Supported Providers
 
