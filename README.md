@@ -174,3 +174,7 @@ QB uses a declarative QoS Model Language (QML) for constraints and objectives in
 ```
 
 See [`docs/model_expression_reference.md`](docs/model_expression_reference.md:1) for the full QML reference.
+
+
+## License
+This project is licensed under the Apache License, Version 2.0. See the `LICENSE` file for the full text.
